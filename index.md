@@ -1,37 +1,112 @@
-## Welcome to GitHub Pages
+//include libraries
+#include <SoftwareSerial.h>
+#include <LiquidCrystal.h>
 
-You can use the [editor on GitHub](https://github.com/Aman-a14/Water-TDS-monitoring/edit/gh-pages/index.md) to maintain and preview the content for your website in Markdown files.
+//for bluetooth - create an object called BTserial, with RX pin at 3 and TX pin at 2
+SoftwareSerial BTserial(3,2); // RX | TX
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+//decraration of all our variables
 
-### Markdown
+float reads;
+int pin = A0;
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+float vOut = 0 ;//voltage drop across 2 points
+float vIn = 5;
+double R1 = 1000;
+double R2 = 0;
+float buffer = 0;
+float TDS;
 
-```markdown
-Syntax highlighted code block
+double r = 0;//resistivity 
+double L = 0.06;//distance between the wires in m
+double A = 0.000154;//area of cross section of wire in m^2
 
-# Header 1
-## Header 2
-### Header 3
+double C = 0;//conductivity in S/m
+double Cm = 0;//conductivity in mS/cm
 
-- Bulleted
-- List
+int rPin = 9;
+int bPin = 5;
+int gPin = 6;
+int rVal = 255;
+int bVal = 255;
+int gVal = 255;
 
-1. Numbered
-2. List
+//we will use this formula to get the resistivity after using ohm's law -> R = r L/A => r = R A/L
 
-**Bold** and _Italic_ and `Code` text
+//creating lcd object from Liquid Crystal library
+LiquidCrystal lcd(8,7,10,11,12,13);
 
-[Link](url) and ![Image](src)
-```
+void setup() {
+  //initialise BT serial and   serial monitor
+  Serial.begin(9600);
+  BTserial.begin(9600);
 
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
+  //initialise lcd
+  lcd.begin(16, 2);
 
-### Jekyll Themes
+  //set rgb led pins (all to be pwm pins on Arduino) as output
+  pinMode(rPin,OUTPUT);
+  pinMode(bPin,OUTPUT);
+  pinMode(gPin,OUTPUT);
+  pinMode(pin,INPUT);
+  //Print stagnant message to LCD
+  lcd.print("Conductivity: ");
+}
 
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/Aman-a14/Water-TDS-monitoring/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
+void loop() {
+    reads = analogRead(A0);
+  
+  vOut = reads*5/1023;
+//  Serial.println(vOut);
+  buffer = (vIn/vOut)-1;
+  R2 = R1*buffer;
+    //convert voltage to resistance
+    //Apply formula mentioned above
+      r = R2*A/L;//R=rL/A
+        Serial.println(R2);
+         delay(500);
+    //convert resistivity to condictivity
+    C = 1/r;
+    Cm = C*10;
+    //convert conductivity in mS/cm to TDS
+    TDS = Cm *700;
+    //Set cursor of LCD to next row
+    lcd.setCursor(0,1);
+    lcd.println(C);
 
-### Support or Contact
+    //display corresponding colours on rgb led according to the analog read
+     if( reads < 600 )
+  {
+      if (reads <= 300){
+        setColor( 255, 0, 255 ) ;
+      }
+      if (reads > 200){
+        setColor( 200, 0, 255 ) ;
+      }
+  }
+  else{
+    if( reads <= 900 )
+    {
+      setColor( 0, 0, 255 ) ;
+    }
+    if( reads > 700 )
+  {
+    setColor( 0, 255, 255 ) ;
+  }
+    }
 
-Having trouble with Pages? Check out our [documentation](https://docs.github.com/categories/github-pages-basics/) or [contact support](https://support.github.com/contact) and we’ll help you sort it out.
+//send data to Ardutooth app on mobile phone through bluetooth
+BTserial.print(C);
+BTserial.print(",");
+BTserial.print(TDS);
+BTserial.print(";");
+delay(500);
+}
+
+
+void setColor(int red, int green, int blue)
+{
+  analogWrite( rPin, 255 - red ) ;
+  analogWrite( gPin, 255 - green ) ;
+  analogWrite( bPin, 255 - blue ) ;  
+}
